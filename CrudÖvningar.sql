@@ -1,17 +1,23 @@
 USE Everyloop
 
 --A
-SELECT Title,
-    'S' + format(Season,'00') + 
+SELECT 
+    Title,
+    'S' + FORMAT(Season,'00') + 
     'E' + FORMAT(EpisodeInSeason, '00')
-FROM GameOfThrones
+    AS Episode
+FROM 
+    GameOfThrones
 
 --B
-UPDATE users2
-SET UserName = LOWER(LEFT(FirstName, 2) + LEFT(LastName, 2))
+UPDATE 
+    users2
+SET 
+    UserName = LOWER(LEFT(FirstName, 2) + LEFT(LastName, 2))
 
 --C
-UPDATE Airports2
+UPDATE 
+    Airports2
 SET
     Time = ISNULL([Time], '-'),
     DST = ISNULL(DST, '-')
@@ -27,11 +33,15 @@ SELECT
     Symbol,
     Name,
     CASE 
-        WHEN LEFT(Name, 2) = Symbol THEN 'Yes'
+        WHEN LEFT(Name, LEN(Symbol)) = Symbol THEN 'Yes'
         ELSE 'No'
     END AS BeginingWithSymbol
     INTO ElementsNames
 FROM Elements
+
+SELECT *
+FROM ElementsNames
+ORDER BY Symbol
 
 --F
 SELECT Name, Red, Green, Blue
@@ -49,13 +59,12 @@ SELECT
 FROM Colors2
 
 --G
+SELECT
+    Integer,
+    CAST([Integer] AS float) / 100 AS Float,
+    String,
+    DATEADD(DAY, [Integer], DATEADD(MINUTE, [Integer], GETDATE() )) AS DateTime,
+    [Integer] % 2 AS Bool
+FROM 
+    Types2
 
-SELECT *
-FROM Types
-
-SELECT Integer,
- CAST([Integer] AS float) / 100 AS Float,
- String,
- DATEADD(MINUTE, [Integer], GETDATE() ) AS DateTime,
- [Integer] % 2 AS Bool
-FROM Types2
