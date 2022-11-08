@@ -6,7 +6,7 @@
 --from Users
 
 
-
+--test
 
 SELECT *
 FROM Elements
@@ -30,3 +30,6 @@ WHERE Valenceel % 2 = 0
 SELECT *
 FROM Elements
 WHERE Boilingpoint IS NULL AND Meltingpoint IS NULL
+
+
+SELECT CONVERT(nvarchar(10), 'aaaaaaaaaaa')
