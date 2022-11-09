@@ -162,7 +162,13 @@ Om vi kollar bland våra ordrar,
 hur stor andel av dessa produkter har vi någon gång leverarat till London
 */
 SELECT 
-    FORMAT(CAST(COUNT(distinct od.ProductId) AS float) / (SELECT COUNT(Distinct ProductName) FROM company.Products), 'P')
+    FORMAT(
+        CAST(COUNT(distinct od.ProductId) AS float) /
+            (SELECT
+                COUNT(Distinct ProductName)
+            FROM
+                company.Products),
+        'P')
 FROM
     company.orders o
     INNER JOIN company.order_details od ON od.OrderId = o.Id
