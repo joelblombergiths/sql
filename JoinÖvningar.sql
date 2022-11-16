@@ -163,12 +163,9 @@ hur stor andel av dessa produkter har vi någon gång leverarat till London
 */
 SELECT 
     FORMAT(
-        CAST(COUNT(distinct od.ProductId) AS float) /
-            (SELECT
-                COUNT(Distinct ProductName)
-            FROM
-                company.Products),
-        'P')
+        CAST(COUNT(distinct od.ProductId) AS float) / (SELECT COUNT(Distinct ProductName) FROM company.Products),
+        'P'
+    )
 FROM
     company.orders o
     INNER JOIN company.order_details od ON od.OrderId = o.Id
@@ -217,7 +214,7 @@ För vilken produktkategori har vi högst lagervärde?
 
 SELECT
     TOP 1 c.CategoryName,
-     SUM(p.UnitsInStock)
+     SUM(p.UnitPrice * p.UnitsInStock)
 FROM
     company.products p
     INNER JOIN company.categories c ON c.Id = p.CategoryId
@@ -233,7 +230,7 @@ Från vilken leverantör har vi sålt flest produkter totalt under sommaren 2013
 */
 SELECT
     TOP 1 s.CompanyName,
-    SUM(od.Quantity)
+    SUM(od.Quantity) TotalQuantity
 
 FROM
     company.orders o
@@ -241,7 +238,7 @@ FROM
     INNER JOIN company.products p ON p.Id = od.ProductId
     INNER JOIN company.suppliers s ON s.Id = p.SupplierId
 WHERE
-    o.OrderDate BETWEEN '2013-06-01' AND '2013-08-31' 
+    o.OrderDate BETWEEN '2013-06-01' AND '2013-08-31 23:59' 
 GROUP BY
     s.CompanyName
 ORDER BY    
@@ -256,13 +253,9 @@ SELECT
     a.Name AS Artist,
     ab.Title AS Album,
     t.Name AS Track,
-    CONCAT(
-        FORMAT(t.Milliseconds / (1000 * 60) % 60,'00'),
-        ':',
-        FORMAT((t.Milliseconds / 1000) % 60,'00')
-    ) AS Length,
-    FORMAT(CAST(t.Bytes AS float) / 1024 / 1024,'0.00') AS Size,
-    t.Composer
+    FORMAT(DATEADD(MILLISECOND, t.Milliseconds, 0),'mm:ss') AS Length,
+    FORMAT(POWER(CAST(t.Bytes AS float), 2),'0.0 MiB') AS Size,
+    ISNULL(t.Composer, 'N/A')
 FROM 
     music.tracks t
     INNER JOIN music.playlist_track pt ON pt.TrackId = t.TrackId
@@ -272,6 +265,8 @@ FROM
     INNER JOIN music.artists a ON a.ArtistId = ab.ArtistId 
 WHERE
     p.Name = @playlist
+ORDER BY    
+    t.Name
 
 --1
 
@@ -297,11 +292,7 @@ SELECT @TopArtist
 --2
 
 SELECT
-    CONCAT(
-        FORMAT(AVG(t.Milliseconds) / (1000 * 60) % 60,'00'),
-        ':',
-        FORMAT((AVG(t.Milliseconds) / 1000) % 60,'00')
-    ) AS Length
+   FORMAT(DATEADD(MILLISECOND, t.Milliseconds, 0),'mm:ss') AS Length
 FROM
     music.artists a
     INNER JOIN music.albums ab ON ab.ArtistId = a.ArtistId
@@ -312,7 +303,7 @@ WHERE
 --3
 
 SELECT
-    FORMAT(CAST(SUM(CAST(t.Bytes AS bigint)) AS float) / 1024 / 1024 / 1024,'0.00 GB') AS TotalSize
+    FORMAT(SUM(CAST(CAST(POWER(t.Bytes, 3) AS bigint) AS float)), '0.00 GB') AS TotalSize
 FROM
     music.tracks t
 WHERE
@@ -353,3 +344,12 @@ FROM
     GROUP BY
         p.Name
 ) AS ap
+
+
+--###
+
+
+SELECT
+    FORMAT(DATEADD(MILLISECOND, t.Milliseconds, 0),'mm:ss')
+FROM
+    music.tracks t
