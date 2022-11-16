@@ -59,7 +59,7 @@ FROM
 ORDER BY
     FirstName,
     LastName
-
+SELECT * FROM Users
 --E
 
 SELECT 
