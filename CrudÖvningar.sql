@@ -59,12 +59,17 @@ SELECT
 FROM Colors2
 
 --G
+
+SELECT *
+FROM Types
+
 SELECT
     Integer,
-    CAST([Integer] AS float) / 100 AS Float,
+    [Integer] / 100.0 AS Float,
     String,
-    DATEADD(DAY, [Integer], DATEADD(MINUTE, [Integer], GETDATE() )) AS DateTime,
+    DATEADD(DAY, [Integer], DATEADD(MINUTE, [Integer], '2018-12-31 09:00:00' )) AS DateTime,
     [Integer] % 2 AS Bool
 FROM 
     Types2
 
+select GETDATE()

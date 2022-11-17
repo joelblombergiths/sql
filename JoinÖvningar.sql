@@ -254,7 +254,7 @@ SELECT
     ab.Title AS Album,
     t.Name AS Track,
     FORMAT(DATEADD(MILLISECOND, t.Milliseconds, 0),'mm:ss') AS Length,
-    FORMAT(POWER(CAST(t.Bytes AS float), 2),'0.0 MiB') AS Size,
+    FORMAT(POWER(CAST(t.Bytes AS float),2),'0.0 MiB') AS Size,
     ISNULL(t.Composer, 'N/A')
 FROM 
     music.tracks t
@@ -303,7 +303,7 @@ WHERE
 --3
 
 SELECT
-    FORMAT(SUM(CAST(CAST(POWER(t.Bytes, 3) AS bigint) AS float)), '0.00 GB') AS TotalSize
+    FORMAT(CAST(SUM(CAST(t.Bytes AS bigint)) / POWER(1024.0, 3) AS float), '0.00 GB') AS TotalSize
 FROM
     music.tracks t
 WHERE
@@ -337,12 +337,12 @@ FROM
         COUNT(DISTINCT a.Name) AS artistsPerPlaylist
     FROM
         music.playlists p
-        INNER JOIN music.playlist_track pt ON pt.PlaylistId = p.PlaylistId
-        INNER JOIN music.tracks t ON t.TrackId = pt.TrackId
-        INNER JOIN music.albums ab ON ab.AlbumId = t.AlbumId
-        INNER JOIN music.artists a ON a.ArtistId = ab.ArtistId
+        LEFT JOIN music.playlist_track pt ON pt.PlaylistId = p.PlaylistId
+        LEFT JOIN music.tracks t ON t.TrackId = pt.TrackId
+        LEFT JOIN music.albums ab ON ab.AlbumId = t.AlbumId
+        LEFT JOIN music.artists a ON a.ArtistId = ab.ArtistId
     GROUP BY
-        p.Name
+        p.PlaylistId
 ) AS ap
 
 

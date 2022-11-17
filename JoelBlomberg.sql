@@ -45,10 +45,9 @@ ORDER BY
 
 GO
 
-DROP TABLE NewUsers
 SELECT 
     u.ID,
-    CAST(u.UserName AS NVARCHAR(8)) AS UserName,
+    u.UserName,
     u.Password,
     CONCAT(u.FirstName, ' ', u.LastName) AS Name,
     CASE SUBSTRING(u.ID, 10, 1) % 2
@@ -77,15 +76,31 @@ GO
 
 WITH duplicates AS (
     SELECT
-        nu.Username,
+        u.FirstName,
+        u.LastName,
+        nu.UserName,
         ROW_NUMBER() OVER (PARTITION BY nu.Username ORDER BY nu.ID) AS Counter
     FROM
         NewUsers nu
+        INNER JOIN Users u ON u.ID = nu.ID
 ) 
 UPDATE 
     duplicates
 SET
-    duplicates.UserName = CONCAT(duplicates.UserName, duplicates.Counter)
+    duplicates.UserName = 
+    CASE
+        WHEN LEN(duplicates.FirstName) >= 4
+        THEN 
+            CONCAT(
+                LOWER(SUBSTRING(duplicates.FirstName, 1, 4)),
+                LOWER(SUBSTRING(duplicates.LastName, 1, 2))
+            )
+        ELSE
+            CONCAT(
+                LOWER(SUBSTRING(duplicates.FirstName, 1, 2)),
+                LOWER(SUBSTRING(duplicates.LastName, 1, 4))
+            )
+    END
 FROM
     duplicates
 WHERE   
@@ -96,7 +111,7 @@ GO
 DELETE FROM
     NewUsers
 WHERE
-    SUBSTRING(ID,1,2) < 70 AND
+    SUBSTRING(ID, 1, 6) < DATEFROMPARTS(1970, 1, 1) AND
     Gender = 'Female'
     
 GO
@@ -133,10 +148,7 @@ SELECT
     AVG(
         DATEDIFF(
             YEAR,
-            DATEFROMPARTS(
-                '19' + SUBSTRING(nu.ID, 1, 2),
-                SUBSTRING(nu.ID, 3, 2),
-                SUBSTRING(nu.ID, 5, 2)),
+            SUBSTRING(nu.ID, 1, 6),
             GETDATE()
         )
     ) AS AverageAge
@@ -174,13 +186,13 @@ GO
 
 SELECT
     e.Id,
-    CONCAT(e.TitleOfCourtesy, ' ', e.FirstName, ' ', e.LastName) AS Employee,
+    CONCAT(e.TitleOfCourtesy, ' ', e.FirstName, ' ', e.LastName) AS Name,
     CASE
         WHEN (e.ReportsTo IS NULL) THEN
             'Nobody!'
         ELSE
             CONCAT(m.TitleOfCourtesy, ' ', m.FirstName, ' ', m.LastName)
-    END AS Manager
+    END AS ReportsTo
 FROM
     company.employees e
     LEFT JOIN company.employees m ON m.Id = e.ReportsTo

@@ -165,3 +165,19 @@ BEGIN
         ID = @i
 END
 --##
+
+WITH duplicates AS (
+    SELECT
+        nu.Username,
+        ROW_NUMBER() OVER (PARTITION BY nu.Username ORDER BY nu.ID) AS Counter
+    FROM
+        NewUsers nu
+) 
+UPDATE 
+    duplicates
+SET
+    duplicates.UserName = CONCAT(duplicates.UserName, duplicates.Counter)
+FROM
+    duplicates
+WHERE   
+    duplicates.Counter > 1

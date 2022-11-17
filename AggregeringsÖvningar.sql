@@ -59,7 +59,7 @@ FROM
 ORDER BY
     FirstName,
     LastName
-SELECT * FROM Users
+
 --E
 
 SELECT 
@@ -104,9 +104,8 @@ många procent av flygplatserna i varje land som saknar ICAO-kod
  */
 
 SELECT 
-    (select [value]
+    CAST(SUBSTRING([value],1, 1) AS CHAR)
 FROM
     Airports
 CROSS APPLY
     string_split([Location served], ',')
-    )
