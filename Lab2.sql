@@ -26,6 +26,7 @@ CREATE TABLE Books
 (
 	ISBN NVARCHAR(20) PRIMARY KEY,
 	Title NVARCHAR(200) NOT NULL,
+    Series NVARCHAR(200) NULL,
 	Language NVARCHAR(50) NULL,
     Price FLOAT NULL,
     PublishedDate DATETIME2 NULL,
@@ -88,7 +89,7 @@ CREATE TABLE Inventory
 (
     ISBN NVARCHAR(20) NOT NULL,
     StoreId INT NOT NULL,
-    Quantity INT NOT NULL DEFAULT(0),
+    Quantity INT NOT NULL DEFAULT(1),
     CONSTRAINT PK_Inventory
         PRIMARY KEY (ISBN, StoreId),
      CONSTRAINT FK_I_Books
@@ -96,7 +97,9 @@ CREATE TABLE Inventory
         REFERENCES Books(ISBN),
     CONSTRAINT FK_I_Stores
         FOREIGN KEY (StoreId)
-        REFERENCES Stores(Id)
+        REFERENCES Stores(Id),
+    CONSTRAINT CHK_I_Positive_Quantity
+        CHECK (Quantity > 0)
 )
 
 CREATE TABLE Customers
@@ -240,38 +243,175 @@ END
 
 GO
 
--- INSERT INTO 
---     Authors
+CREATE VIEW TitlesPerAuthor AS
+SELECT
+    CONCAT(a.FirstName, ' ', a.LastName) AS Name,
+    DATEDIFF(YEAR,a.DOB, GETDATE()) AS Age,
+    COUNT(distinct b.ISBN) AS Titles,    
+    FORMAT(SUM(i.Quantity * b.Price),'C','se') AS 'Inventory Value'
+FROM
+    Authors a
+    INNER JOIN BookAuthors ba ON ba.AuthorId = a.Id
+    INNER JOIN Books b ON b.ISBN = ba.ISBN
+    INNER JOIN Inventory i ON i.ISBN = b.ISBN
+GROUP BY
+    a.FirstName,
+    a.LastName,
+    a.DOB
+
+GO
+
+
+
+ALTER PROCEDURE MoveBook
+    @FromStore int,
+    @ToStore int,
+    @ISBN NVARCHAR(20),
+    @Quantity int = 1
+AS
+BEGIN
+    BEGIN TRY
+        IF(@FromStore = @ToStore)        
+            THROW 50000, 'Destination Same As Source', 0
+
+        DECLARE @checkInput int
+
+        SELECT
+            @checkInput = COUNT(*)
+        FROM
+            Inventory i
+        WHERE
+            i.ISBN = @ISBN
+
+        IF(@checkInput <= 0)
+            THROW 50000, 'Book Not In Any Store', 0
+
+        SELECT
+            @checkInput = COUNT(*)
+        FROM
+            Stores s
+        WHERE
+            s.Id = @FromStore
+
+        IF(@checkInput <= 0)
+            THROW 50000, '"From" Store Not Found', 0
+
+        SELECT
+            @checkInput = COUNT(*)
+        FROM
+            Stores s
+        WHERE
+            s.Id = @ToStore
+
+        IF(@checkInput <= 0)
+            THROW 50000, '"To" Store Not Found', 0
+
+        SELECT
+            @checkInput = COUNT(*)
+        FROM
+            Inventory i
+        WHERE
+            i.ISBN = @ISBN AND
+            i.StoreId = @FromStore AND
+            i.Quantity >= @Quantity
+
+        IF(@checkInput <= 0)
+            THROW 50000, 'Quantity Too Big', 0
+        
+        BEGIN TRAN
+
+        DECLARE @beforeSum int
+
+        SELECT
+            @beforeSum = SUM(i.Quantity)
+        FROM
+            Inventory i            
+        WHERE
+            i.ISBN = @ISBN AND
+            i.StoreId IN (@FromStore, @ToStore)
+
+        UPDATE
+            Inventory
+        SET 
+            Quantity = Quantity - @Quantity
+        WHERE
+            ISBN = @ISBN AND
+            StoreId = @FromStore
+
+        UPDATE
+            Inventory
+        SET 
+            Quantity = Quantity + @Quantity
+        WHERE
+            ISBN = @ISBN AND
+            StoreId = @ToStore
+
+        
+        DECLARE @afterSum int
+
+        SELECT
+            @afterSum = SUM(i.Quantity)
+        FROM
+            Inventory i            
+        WHERE
+            i.ISBN = @ISBN AND
+            i.StoreId IN (@FromStore, @ToStore)
+
+        IF(@beforeSum = @afterSum)        
+            COMMIT
+        ELSE
+            THROW 50000, 'Missmatch In Transfer', 0
+    END TRY
+    BEGIN CATCH
+        SELECT ERROR_MESSAGE()
+        ROLLBACK
+    END CATCH
+END
+
+
+GO
+
+EXEC MoveBook 1,2,'9780316129060'
+-- INSERT INTO Stores
 -- VALUES
 -- (
---     'Robert',
---     'Jordan',
---     '1948-10-17'
+--     'The Fantastic Story Keeper',
+--     '123 W 11th St',
+--     'NY 10014',
+--     'New York',
+--     'United States'
 -- ),
 -- (
---     'J.K',
---     'Rowling',
---     '1965-07-31'
+--     'The Wondrous Story Keeper',
+--     '123 Shaftesbury Ave',
+--     'WC2H 8HB',
+--     'London',
+--     'United Kingdom'
 -- ),
 -- (
---     'James',
---     'Corey',
---     '1900-01-01'
+--     'The Inspiring Story Keeper',
+--     'Teatergatan 123',
+--     '411 35',
+--     'Gothenburg',
+--     'Sweden'
 -- ),
 -- (
---     'Douglas',
---     'Adams',
---     '1952-05-11'
+--     'The Digital Story Keeper',
+--     'www.storykeeper.com',
+--     '',
+--     '',
+--     'Internet'
 -- )
 
 
 
-SELECT * FROM Authors
+
+
+
+
+
 -- SELECT IIF(dbo.ValidateISBNv2('978-0-306-40615-7') = 1, 1, 0)
 -- SELECT dbo.ValidateISBNv2('978-3-16-148410-0')
 
 -- select FORMAT(100,'C','se')
 
-SELECT *
-FROM tabell
-WHERE ISNULL(column, 0) IN (0,1)
