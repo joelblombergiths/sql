@@ -181,3 +181,52 @@ FROM
     duplicates
 WHERE   
     duplicates.Counter > 1
+
+
+    
+DECLARE @ISBN NVARCHAR(20) = '978-0-306-40615-'
+SET @ISBN = REPLACE(REPLACE(@ISBN, '-', ''), ' ', '')
+
+
+
+;WITH isbnPart AS
+(
+    SELECT TOP (LEN(@ISBN)) 
+        SUBSTRING(@ISBN, t.n, 1) AS Digit,
+        CASE t.n % 2
+            WHEN 0 THEN 3
+            ELSE 1
+        END AS Multiplier
+    FROM Everyloop.dbo.TallyTable t
+)
+SELECT
+    CASE WHEN SUM(p.Digit * p.Multiplier) % 10 = 0
+        THEN 0
+        ELSE 10 - SUM(p.Digit * p.Multiplier) % 10
+    END
+FROM
+    isbnPart p
+
+DECLARE @ISBN NVARCHAR(20) = '978-0-306-40615-6'
+SET @ISBN = REPLACE(REPLACE(@ISBN, '-', ''), ' ', '')
+DECLARE @ISBN_PART VARCHAR(12) = SUBSTRING(@ISBN, 1, 12)
+DECLARE @checksum INT
+SELECT @checksum =
+    CASE WHEN SUM(checksum.Digit * checksum.Multiplier) % 10 = 0
+        THEN 0
+        ELSE 10 - SUM(checksum.Digit * checksum.Multiplier) % 10
+    END
+FROM
+(
+    SELECT TOP (LEN(@ISBN_PART)) 
+        SUBSTRING(@ISBN_PART, t.n, 1) AS Digit,
+        CASE t.n % 2
+            WHEN 0 THEN 3
+            ELSE 1
+        END AS Multiplier
+    FROM TallyTable t
+) AS checksum
+
+IF (SUBSTRING(@ISBN, 13, 1) = @checksum)
+    PRINT('1')
+

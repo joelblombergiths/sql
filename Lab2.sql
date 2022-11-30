@@ -264,58 +264,34 @@ GO
 
 
 ALTER PROCEDURE MoveBook
-    @FromStore int,
-    @ToStore int,
+    @FromStore INT,
+    @ToStore INT,
     @ISBN NVARCHAR(20),
-    @Quantity int = 1
+    @Quantity INT = 1
 AS
 BEGIN
     BEGIN TRY
         IF(@FromStore = @ToStore)        
             THROW 50000, 'Destination Same As Source', 0
 
-        DECLARE @checkInput int
+        IF NOT EXISTS (SELECT * FROM Stores WHERE Id = @FromStore)
+            THROW 50000, 'Source Store Not Found', 0
 
-        SELECT
-            @checkInput = COUNT(*)
-        FROM
-            Inventory i
-        WHERE
-            i.ISBN = @ISBN
+        IF NOT EXISTS (SELECT * FROM Stores WHERE Id = @ToStore)        
+            THROW 50000, 'Destination Store Not Found', 0
 
-        IF(@checkInput <= 0)
-            THROW 50000, 'Book Not In Any Store', 0
+        IF NOT EXISTS (SELECT * FROM Books WHERE ISBN = @ISBN)
+            THROW 50000, 'Book Not Found', 0
 
-        SELECT
-            @checkInput = COUNT(*)
-        FROM
-            Stores s
-        WHERE
-            s.Id = @FromStore
-
-        IF(@checkInput <= 0)
-            THROW 50000, '"From" Store Not Found', 0
-
-        SELECT
-            @checkInput = COUNT(*)
-        FROM
-            Stores s
-        WHERE
-            s.Id = @ToStore
-
-        IF(@checkInput <= 0)
-            THROW 50000, '"To" Store Not Found', 0
-
-        SELECT
-            @checkInput = COUNT(*)
-        FROM
-            Inventory i
-        WHERE
-            i.ISBN = @ISBN AND
-            i.StoreId = @FromStore AND
-            i.Quantity >= @Quantity
-
-        IF(@checkInput <= 0)
+        IF NOT EXISTS
+        (
+            SELECT * 
+            FROM Inventory i
+            WHERE
+                i.ISBN = @ISBN AND
+                i.StoreId = @FromStore AND
+                i.Quantity >= @Quantity
+        )
             THROW 50000, 'Quantity Too Big', 0
         
         BEGIN TRAN
@@ -330,23 +306,55 @@ BEGIN
             i.ISBN = @ISBN AND
             i.StoreId IN (@FromStore, @ToStore)
 
-        UPDATE
-            Inventory
-        SET 
-            Quantity = Quantity - @Quantity
+        DECLARE @sourceQuantity INT
+
+        SELECT
+            @sourceQuantity = Quantity
+        FROM
+            Inventory i
         WHERE
             ISBN = @ISBN AND
             StoreId = @FromStore
 
-        UPDATE
-            Inventory
-        SET 
-            Quantity = Quantity + @Quantity
-        WHERE
-            ISBN = @ISBN AND
-            StoreId = @ToStore
+        IF(@sourceQuantity > @Quantity)
+            BEGIN
+                UPDATE
+                    Inventory
+                SET 
+                    Quantity = Quantity - @Quantity
+                WHERE
+                    ISBN = @ISBN AND
+                    StoreId = @FromStore
+            END
+        ELSE
+            BEGIN
+                DELETE FROM Inventory
+                WHERE
+                    ISBN = @ISBN AND
+                    StoreId = @FromStore
+            END
 
-        
+        IF EXISTS (SELECT * FROM Inventory WHERE StoreId = @ToStore AND @ISBN = @ISBN)    
+            BEGIN
+                UPDATE
+                    Inventory
+                SET 
+                    Quantity = Quantity + @Quantity
+                WHERE
+                    ISBN = @ISBN AND
+                    StoreId = @ToStore
+            END
+        ELSE
+            BEGIN    
+                INSERT INTO Inventory
+                VALUES
+                (
+                    @ISBN,
+                    @ToStore,
+                    @Quantity
+                )
+            END
+
         DECLARE @afterSum int
 
         SELECT
@@ -361,17 +369,56 @@ BEGIN
             COMMIT
         ELSE
             THROW 50000, 'Missmatch In Transfer', 0
+
     END TRY
     BEGIN CATCH
-        SELECT ERROR_MESSAGE()
-        ROLLBACK
+        SELECT ERROR_MESSAGE() AS ERROR
+
+        IF(@@trancount > 0)
+            ROLLBACK
     END CATCH
 END
 
-
 GO
 
-EXEC MoveBook 1,2,'9780316129060'
+
+CREATE VIEW ShowToplist AS
+/*
+This view shows the toprated and most frequently bought books
+that the stores uses to determine what books to display most prominently
+and to make sure is in stock in all stores.
+*/
+
+SELECT TOP 5
+    b.Title,
+    AVG(CAST(r.Rating AS float)) AS AverageRating,
+    SUM(row.Quantity) AS TotalBooksSold
+FROM
+    Books b
+    INNER JOIN OrderRows row ON row.ISBN = b.ISBN
+    INNER JOIN Reviews r ON r.ISBN = b.ISBN
+GROUP BY
+    b.Title
+ORDER BY
+    AverageRating DESC,
+    TotalBooksSold DESC
+
+GO
+-- UPDATE Reviews
+-- SET Rating = 5
+-- WHERE ISBN = '9780261103283'
+
+-- INSERT INTO Reviews
+-- SELECT
+--     ISBN,
+--     t.n,
+--     ABS(CHECKSUM(NewId())) % 5 + 1,
+--     'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nunc a imperdiet leo. Proin eu justo dui. Praesent rutrum auctor sapien, nec interdum elit varius eget. Sed dui purus, commodo eget nulla ultricies, hendrerit sagittis dui. Integer bibendum dui justo, quis blandit arcu maximus non. Aenean ut blandit ante, in sagittis orci. Aliquam nec sapien dignissim, iaculis magna quis, posuere erat. Mauris porta viverra neque, ac condimentum purus. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. In et massa ac magna finibus pretium. Donec rutrum mauris vitae metus sollicitudin, nec faucibus mi lacinia. Morbi at pellentesque nibh.'
+-- FROM
+--     Books
+-- CROSS APPLY TallyTable t
+-- WHERE t.n <= 20
+
 -- INSERT INTO Stores
 -- VALUES
 -- (
@@ -403,10 +450,31 @@ EXEC MoveBook 1,2,'9780316129060'
 --     'Internet'
 -- )
 
+-- INSERT INTO Customers
+-- VALUES
+--   ('Nevada','Herrera','nevadaherrera140@outlook.couk','3528 Sit Road','351117','Massa Martana','South Korea'),
+--   ('Barry','Buck','barrybuck@aol.com','758-4650 Dolor. St.','268726','Copenhagen','Germany'),
+--   ('Roth','Alford','rothalford9956@google.edu','889-5928 Amet Rd.','2116 NT','Meerhout','China'),
+--   ('Russell','Stewart','russellstewart@icloud.org','626-6890 Diam Rd.','5446','Conselice','Belgium'),
+--   ('Berk','Irwin','berkirwin7083@icloud.couk','291-7630 Congue. Rd.','60007','Bahawalnagar','Spain'),
+--   ('Iona','Cortez','ionacortez@yahoo.couk','P.O. Box 337, 2964 Ornare, Street','746573','Albury','Italy'),
+--   ('Dominique','Winters','dominiquewinters@aol.net','910-6235 Volutpat. St.','2594','Grayvoron','France'),
+--   ('Barbara','Branch','barbarabranch@icloud.com','Ap #923-8808 In, Road','65-56','Gore','Singapore'),
+--   ('Alden','Kane','aldenkane@hotmail.net','331-3605 Sed Rd.','219590','Blois','Ireland'),
+--   ('Levi','Petty','levipetty@hotmail.net','Ap #573-8854 Hendrerit St.','7688','Plauen','Norway');
 
-
-
-
+-- INSERT INTO Customers
+-- VALUES
+--   ('Jackson','Herman','jacksonherman5489@icloud.ca','754-848 At, Av.','10528','Kupang','Sweden'),
+--   ('Charity','Guzman','charityguzman7332@protonmail.org','Ap #961-3622 Ante Road','50-066','San Andrés','Sweden'),
+--   ('Dylan','Barnett','dylanbarnett3661@hotmail.couk','Ap #852-8578 Tincidunt St.','236763','Campinas','United Kingdom'),
+--   ('Mariko','Oneal','marikooneal@hotmail.couk','Ap #460-6274 Fusce Av.','74743','Bogotá','United States'),
+--   ('Dorian','Hicks','dorianhicks9534@outlook.ca','Ap #553-771 Aliquet St.','70729','Makurdi','Sweden'),
+--   ('Leila','Odom','leilaodom9580@hotmail.ca','P.O. Box 943, 2340 Auctor, Av.','21731','Baubau','United States'),
+--   ('Cheryl','Benson','cherylbenson8062@icloud.net','P.O. Box 225, 9685 Elementum Street','6371-0615','Bryne','United States'),
+--   ('Ria','Mendez','riamendez7167@outlook.couk','P.O. Box 172, 4467 Ornare, St.','469280','Almere','United States'),
+--   ('Haley','Wynn','haleywynn4868@aol.couk','Ap #397-6029 Ornare St.','533553','Neelum Valley','Sweden'),
+--   ('Laurel','Bonner','laurelbonner@icloud.com','P.O. Box 695, 8676 Metus Rd.','72731','Bạc Liêu','United Kingdom');
 
 
 
