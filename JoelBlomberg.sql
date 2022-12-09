@@ -22,7 +22,7 @@ GO
 UPDATE
     SuccessfulMissions
 SET
-    Operator = RTRIM(SUBSTRING(Spacecraft, 1, CHARINDEX('(', Spacecraft)))
+    Spacecraft = RTRIM(SUBSTRING(Spacecraft, 1, CHARINDEX('(', Spacecraft) - 1))
 WHERE
     CHARINDEX('(', Spacecraft) > 0
 
