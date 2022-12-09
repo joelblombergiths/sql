@@ -61,20 +61,6 @@ CREATE TABLE BookAuthors
 )
 
 
--- CREATE TABLE BookPublishers
--- (
---     ISBN NVARCHAR(20) NOT NULL,
---     PublisherId INT NOT NULL,
---     CONSTRAINT PK_BookPublishers
---         PRIMARY KEY(ISBN, PublisherId),
---     CONSTRAINT FK_BP_Books
---         FOREIGN KEY (ISBN)
---         REFERENCES Books(ISBN),
---     CONSTRAINT FK_BP_Publishers
---         FOREIGN KEY (PublisherId)
---         REFERENCES Publishers(Id)
--- )
-
 CREATE TABLE Stores
 (
 	Id INT IDENTITY(1, 1) PRIMARY KEY,
@@ -334,7 +320,7 @@ BEGIN
                     StoreId = @FromStore
             END
 
-        IF EXISTS (SELECT * FROM Inventory WHERE StoreId = @ToStore AND @ISBN = @ISBN)    
+        IF EXISTS (SELECT * FROM Inventory WHERE StoreId = @ToStore AND ISBN = @ISBN)    
             BEGIN
                 UPDATE
                     Inventory
